@@ -28,7 +28,9 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = []
+dependencies = [
+    "pydantic>=2.10.6",
+]
 
 [project.optional-dependencies]
 test = [
