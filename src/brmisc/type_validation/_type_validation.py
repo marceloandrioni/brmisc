@@ -5,7 +5,8 @@ __all__ = [
     "datetime_like",
     "datetime_like_naive",
     "datetime_like_aware",
-    "datetime_like_utc",
+    "datetime_like_naive_or_utc_to_naive",
+    "datetime_like_naive_or_utc_to_utc",
     "path_like",
 ]
 
@@ -16,7 +17,6 @@ from pydantic import (
     Field, NaiveDatetime, AwareDatetime)
 import numbers
 import datetime
-import pytz
 from itertools import accumulate
 import numpy as np
 import pandas as pd
@@ -81,8 +81,6 @@ validate_types_in_func_call.__doc__ = (
     (1, 'abc')
 
     >>> func(1, 2)
-    ValidationError: 1 validation error for func
-    1
       Input should be a valid string [type=string_type, input_value=2,
     input_type=int]
 
@@ -110,7 +108,6 @@ def validate_type(value: Any, type: Any = Any) -> Any:
     1
 
     >>> validate_type(1.0, int)
-    ValidationError: 1 validation error for int
       Input should be a valid integer [type=int_type, input_value=1.0,
     input_type=float]
 
@@ -151,8 +148,6 @@ int_like.__doc__ = (
     10
 
     >>> func(10.1)
-    ValidationError: 1 validation error for func
-    0
       Assertion failed, value 10.1 is not a round number [type=assertion_error,
     input_value=10.1, input_type=float]
 
@@ -165,8 +160,6 @@ int_like.__doc__ = (
     ...     return x
 
     >>> func(9)
-    ValidationError: 1 validation error for func
-    0
       Input should be greater than 10 [type=greater_than, input_value=9,
     input_type=int]
 
@@ -176,8 +169,6 @@ int_like.__doc__ = (
     10
 
     >>> validate_type(10.1, int_like)
-    ValidationError: 1 validation error for function-before[parse_round_number(),
-    int]
       Assertion failed, value 10.1 is not a round number [type=assertion_error,
     input_value=10.1, input_type=float]
 
@@ -223,8 +214,8 @@ def datetime_formats() -> list[str]:
     return fmts
 
 
-def parse_str(value: Any) -> Any:
-    """Validate time string."""
+def parse_timestr(value: Any) -> Any:
+    """Parse time string."""
 
     # Note: pydantic parses strings without "-" as seconds/miliseconds, e.g.:
     # >>> TypeAdapter(datetime.datetime).validate_python("20010203")
@@ -248,7 +239,7 @@ def parse_str(value: Any) -> Any:
 
 
 def dt_naive_to_dt_utc(dt: datetime.datetime) -> datetime.datetime:
-    if isinstance(dt, datetime.datetime) and dt.tzinfo is None:
+    if dt.tzinfo is None:
         return dt.astimezone(datetime.timezone.utc)
     return dt
 
@@ -260,12 +251,19 @@ def dt_must_be_utc(dt: datetime.datetime) -> datetime.datetime:
     return dt
 
 
+def dt_utc_to_dt_naive(dt: datetime.datetime) -> datetime.datetime:
+    if dt.tzinfo is not None:
+        dt_must_be_utc(dt)
+        return dt.replace(tzinfo=None)
+    return dt
+
+
 datetime_like = Annotated[
     datetime.datetime,
     BeforeValidator(parse_date),
     BeforeValidator(parse_dt64),
     BeforeValidator(parse_timestamp),
-    BeforeValidator(parse_str),
+    BeforeValidator(parse_timestr),
 ]
 datetime_like.__doc__ = (
     """Type alias to validate datetime_like (datetime, date, np.datetime64,
@@ -304,8 +302,7 @@ datetime_like_naive = Annotated[(
     *(datetime_like.__metadata__),
 )]
 datetime_like_naive.__doc__ = (
-    """Same as datetime_like, but only naive (without time-zone) datetimes
-    are allowed.
+    """Same as datetime_like, but only naive datetimes are allowed.
 
     Examples
     --------
@@ -313,9 +310,6 @@ datetime_like_naive.__doc__ = (
     datetime.datetime(2001, 2, 3, 4, 5, 6)
 
     >>> validate_type("2001-02-03 04:05:06Z", datetime_like_naive)
-    ValidationError: 1 validation error for function-before[parse_str(),
-    function-before[parse_timestamp(), function-before[parse_dt64(),
-    function-before[parse_date(), datetime]]]]
       Input should not have timezone info [type=timezone_naive,
     input_value=datetime.datetime(2001, 2...o=datetime.timezone.utc),
     input_type=datetime]
@@ -329,8 +323,7 @@ datetime_like_aware = Annotated[(
     *(datetime_like.__metadata__),
 )]
 datetime_like_aware.__doc__ = (
-    """Same as datetime_like, but only aware (with time-zone) datetimes
-    are allowed.
+    """Same as datetime_like, but only aware datetimes are allowed.
 
     Examples
     --------
@@ -338,9 +331,6 @@ datetime_like_aware.__doc__ = (
     datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
 
     >>> validate_type("2001-02-03 04:05:06", datetime_like_aware)
-    ValidationError: 1 validation error for function-before[parse_str(),
-    function-before[parse_timestamp(), function-before[parse_dt64(),
-    function-before[parse_date(), datetime]]]]
       Input should have timezone info [type=timezone_aware,
     input_value=datetime.datetime(2001, 2, 3, 4, 5, 6), input_type=datetime]
 
@@ -351,32 +341,59 @@ datetime_like_aware.__doc__ = (
 # Note: BeforeValidators are executed right-to-left, while AfterValidators are
 # run left-to-rigth.
 # https://docs.pydantic.dev/latest/concepts/validators/#ordering-of-validators
-datetime_like_utc = Annotated[(
+datetime_like_naive_or_utc_to_utc = Annotated[(
     AwareDatetime,
     BeforeValidator(dt_naive_to_dt_utc),   # run after all others BeforeValidators
     *(datetime_like.__metadata__),
     AfterValidator(dt_must_be_utc),
 )]
-datetime_like_utc.__doc__ = (
-    """Same as datetime_like, but only UTC datetimes are allowed. Naive
-    (without time-zone) datetimes are assumed to represent UTC time-zone.
+datetime_like_naive_or_utc_to_utc.__doc__ = (
+    """Same as datetime_like, but only naive and UTC datetimes are allowed.
+
+    Naive datetimes are coerced to UTC.
 
     Examples
     --------
-    >>> validate_type("2001-02-03 04:05:06", datetime_like_utc)
+    >>> validate_type("2001-02-03 04:05:06", datetime_like_naive_or_utc_to_utc)
     datetime.datetime(2001, 2, 3, 6, 5, 6, tzinfo=datetime.timezone.utc)
 
-    >>> validate_type("2001-02-03 04:05:06Z", datetime_like_utc)
+    >>> validate_type("2001-02-03 04:05:06Z", datetime_like_naive_or_utc_to_utc)
     datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
 
-    >>> validate_type("2001-02-03 04:05:06+00:00", datetime_like_utc)
+    >>> validate_type("2001-02-03 04:05:06+00:00", datetime_like_naive_or_utc_to_utc)
     datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
 
-    >>> validate_type("2001-02-03 04:05:06-03:00", datetime_like_utc)
-    ValidationError: 1 validation error for function-after[dt_must_be_utc(),
-    function-before[parse_str(), function-before[parse_timestamp(),
-    function-before[parse_dt64(), function-before[parse_date(),
-    function-before[dt_naive_to_dt_utc(), datetime]]]]]]
+    >>> validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_utc)
+      Value error, datetime object must have UTC timezone [type=value_error,
+    input_value=datetime.datetime(2001, 2...ays=-1, seconds=75600))),
+    input_type=datetime]
+
+    """
+)
+
+
+datetime_like_naive_or_utc_to_naive = Annotated[(
+    NaiveDatetime,
+    BeforeValidator(dt_utc_to_dt_naive),   # run after all others BeforeValidators
+    *(datetime_like.__metadata__),
+)]
+datetime_like_naive_or_utc_to_naive.__doc__ = (
+    """Same as datetime_like, but only naive and UTC datetimes are allowed.
+
+    UTC datetimes are coerced to naive.
+
+    Examples
+    --------
+    >>> validate_type("2001-02-03 04:05:06", datetime_like_naive_or_utc_to_naive)
+    datetime.datetime(2001, 2, 3, 4, 5, 6)
+
+    >>> validate_type("2001-02-03 04:05:06Z", datetime_like_naive_or_utc_to_naive)
+    datetime.datetime(2001, 2, 3, 4, 5, 6)
+
+    >>> validate_type("2001-02-03 04:05:06+00:00", datetime_like_naive_or_utc_to_naive)
+    datetime.datetime(2001, 2, 3, 4, 5, 6)
+
+    >>> validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_naive)
       Value error, datetime object must have UTC timezone [type=value_error,
     input_value='2001-02-03 04:05:06-03:00', input_type=str]
 
@@ -388,8 +405,7 @@ datetime_like_utc.__doc__ = (
 # set strict=False to allow coercion from string
 path_like = Annotated[Path, Field(strict=False)]
 path_like.__doc__ = (
-    """Type alias to validate Path, str, etc. If valid, the value is coerced to
-    Path.
+    """Type alias to validate path_like (Path, str, etc) and coerce it to path.
 
     Examples
     --------
