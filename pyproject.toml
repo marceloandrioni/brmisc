@@ -28,7 +28,10 @@ classifiers = [
   "Typing :: Typed",
 ]
 dynamic = ["version"]
-dependencies = []
+dependencies = [
+    "pandas>=2.2.3",
+    "pydantic>=2.10.6",
+]
 
 [project.optional-dependencies]
 test = [
@@ -79,6 +82,9 @@ filterwarnings = [
 log_cli_level = "INFO"
 testpaths = [
   "tests",
+]
+pythonpath = [
+  ".", "src",
 ]
 
 
