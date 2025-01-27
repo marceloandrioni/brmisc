@@ -7,6 +7,11 @@ __all__ = [
     "datetime_like_aware",
     "datetime_like_naive_or_utc_to_naive",
     "datetime_like_naive_or_utc_to_utc",
+    "dt_must_be_YYYYmmdd_HHMM00",   # rounded to second
+    "dt_must_be_YYYYmmdd_HH0000",   # rounded to minute
+    "dt_must_be_YYYYmmdd_000000",   # rounded to midnight
+    "dt_must_be_YYYYmm01_000000",   # rounded to 1st day of month
+    "dt_must_be_YYYY0101_000000",   # rounded to 1st day of year
     "path_like",
 ]
 
@@ -24,8 +29,8 @@ from pathlib import Path
 
 
 # Note:
-# Pydantic is too lax with parsing, so always use strict=True.
-# Arbitrary_types_allowed is needed for numpy, pandas, xarray, etc.
+# * Pydantic is too lax with parsing, so always use strict=True.
+# * Arbitrary_types_allowed is needed for numpy, pandas, xarray, etc.
 CONFIG = ConfigDict(
     strict=True,
     arbitrary_types_allowed=True,
@@ -401,6 +406,85 @@ datetime_like_naive_or_utc_to_naive.__doc__ = (
 )
 
 
+DT_REPLACE_DICT: dict[str, int] = dict(
+    microsecond=0,
+    second=0,
+    minute=0,
+    hour=0,
+    day=1,
+    month=1,
+)
+
+
+def get_dict_until(d: dict[Any, Any], key: Any) -> dict[Any, Any]:
+
+    # raise KeyError if key is not present
+    _ = d[key]
+
+    index = list(d).index(key)
+
+    keys = list(d)[0: index + 1]
+    values = list(d.values())[0: index + 1]
+
+    return {k: v for k, v in zip(keys, values)}
+
+
+def raise_if_dt_is_not_floored_to_the_first(
+        dt: datetime.datetime,
+        units: str,
+) -> datetime.datetime:
+
+    if (dt - dt.replace(**get_dict_until(DT_REPLACE_DICT, units))):
+        raise ValueError(f'datetime must be "floored" to the first {units}')
+    return dt
+
+
+# The functions bellow can be used as validators, e.g.:
+#
+# >>> @validate_types_in_func_call
+# ... def func(
+# ...     dt: Annotated[
+# ...         datetime_like_naive_or_utc_to_naive,
+# ...         AfterValidator(dt_must_be_YYYYmm01_000000),
+# ...     ],
+# ... ) -> None:
+# ...     print(dt)
+
+def dt_must_be_YYYYmmdd_HHMM00(dt: datetime.datetime) -> datetime.datetime:
+    """Raise exception if datetime is not 'YYYY-mm-dd HH:MM:00'."""
+    return raise_if_dt_is_not_floored_to_the_first(dt, "second")
+
+
+def dt_must_be_YYYYmmdd_HH0000(dt: datetime.datetime) -> datetime.datetime:
+    """Raise exception if datetime is not 'YYYY-mm-dd HH:00:00'."""
+    return raise_if_dt_is_not_floored_to_the_first(dt, "minute")
+
+
+def dt_must_be_YYYYmmdd_000000(dt: datetime.datetime) -> datetime.datetime:
+    """Raise exception if datetime is not 'YYYY-mm-dd 00:00:00'."""
+    return raise_if_dt_is_not_floored_to_the_first(dt, "hour")
+
+
+def dt_must_be_YYYYmm01_000000(dt: datetime.datetime) -> datetime.datetime:
+    """Raise exception if datetime is not 'YYYY-mm-01 00:00:00'."""
+    return raise_if_dt_is_not_floored_to_the_first(dt, "day")
+
+
+def dt_must_be_YYYY0101_000000(dt: datetime.datetime) -> datetime.datetime:
+    """Raise exception if datetime is not 'YYYY-01-01 00:00:00'."""
+    return raise_if_dt_is_not_floored_to_the_first(dt, "month")
+
+
+# -----------------------------------------------------------------------------
+# TODO: create timedelta validators.
+# * maybe return a dateutil.relativedelta.relativedelta object as datetime.timedelta
+#   only accepts time deltas up to days.
+# * the validator should accept ISO8601 str (e.g. 'P3DT12H30M5S') using pydantic
+#   https://docs.pydantic.dev/latest/api/standard_library_types/#datetimetimedelta
+# * maybe accept datetime.timedelta, ISO8601 str and dict (e.g.: {"months":2, "days"=3})
+#   and coerce everything to dateutil.relativedelta.relativedelta
+# * accept int/float as seconds
+
 # -----------------------------------------------------------------------------
 # set strict=False to allow coercion from string
 path_like = Annotated[Path, Field(strict=False)]
@@ -419,8 +503,8 @@ path_like.__doc__ = (
 )
 
 # TODO: create some more path types, e.g.:
-# pydantic FilePath : must exist and be a file
-# pydantic DirectoryPath: must exist and be a directory
-# pydantic NewPath : must be new and parent exist (maybe turn off parent necessity)
-# Path_must_be_overwritable
-# check https://github.com/xfrenette/pathtype for ideas
+# * pydantic FilePath : must exist and be a file
+# * pydantic DirectoryPath: must exist and be a directory
+# * pydantic NewPath : must be new and parent exist (maybe turn off parent necessity)
+# * Path_must_be_overwritable
+# * check https://github.com/xfrenette/pathtype for ideas
