@@ -222,7 +222,7 @@ def datetime_formats() -> list[str]:
 def parse_timestr(value: Any) -> Any:
     """Parse time string."""
 
-    # Note: pydantic parses strings without "-" as seconds/miliseconds, e.g.:
+    # Note: pydantic parses strings without "-" as seconds/milliseconds, e.g.:
     # >>> TypeAdapter(datetime.datetime).validate_python("20010203")
     # datetime.datetime(1970, 8, 20, 14, 23, 23, tzinfo=TzInfo(UTC))
     # so using a custom list of valid formats
@@ -234,7 +234,7 @@ def parse_timestr(value: Any) -> Any:
         for fmt in fmts:
             try:
                 return datetime.datetime.strptime(value, fmt)
-            except Exception as err:
+            except ValueError as err:
                 pass
 
         fmts_str = "\n".join(fmts)
@@ -406,14 +406,14 @@ datetime_like_naive_or_utc_to_naive.__doc__ = (
 )
 
 
-DT_REPLACE_DICT: dict[str, int] = dict(
-    microsecond=0,
-    second=0,
-    minute=0,
-    hour=0,
-    day=1,
-    month=1,
-)
+DT_REPLACE_DICT: dict[str, int] = {
+    "microsecond": 0,
+    "second": 0,
+    "minute": 0,
+    "hour": 0,
+    "day": 1,
+    "month": 1,
+}
 
 
 def get_dict_until(d: dict[Any, Any], key: Any) -> dict[Any, Any]:

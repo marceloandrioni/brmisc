@@ -1,11 +1,9 @@
 import pytest
 
-from functools import partial
 import datetime
 import pytz
 import numpy as np
 import pandas as pd
-import importlib.metadata
 
 from pydantic import ValidationError
 
