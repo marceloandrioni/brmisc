@@ -1,11 +1,13 @@
-import pytest
-
+from typing import Annotated
 import datetime
+from pathlib import Path
 import pytz
+import pytest
 import numpy as np
 import pandas as pd
 
-from pydantic import ValidationError
+
+from pydantic import ValidationError, AfterValidator
 
 from brmisc.type_validation import (
     validate_types_in_func_call,
@@ -23,6 +25,29 @@ from brmisc.type_validation import (
     dt_must_be_YYYY0101_000000,
     path_like,
 )
+
+
+def test_validate_types_in_func_call_with_correct_types():
+    @validate_types_in_func_call
+    def divide_by_2(x: int) -> float:
+        return x / 2
+    divide_by_2(5)
+
+
+def test_validate_types_in_func_call_with_incorrect_in_type():
+    @validate_types_in_func_call
+    def divide_by_2(x: int) -> float:
+        return x / 2
+    with pytest.raises(ValidationError, match=r".*Input should be a valid integer.*"):
+        divide_by_2(5.0)
+
+
+def test_validate_types_in_func_call_with_incorrect_out_type():
+    @validate_types_in_func_call
+    def divide_by_2(x: int) -> int:
+        return x / 2
+    with pytest.raises(ValidationError, match=r".*Input should be a valid integer.*"):
+        divide_by_2(5)
 
 
 def test_int_like_with_round_float():
@@ -169,3 +194,98 @@ def test_datetime_like_naive_or_utc_to_utc_with_utc():
 def test_datetime_like_naive_or_utc_to_utc_with_non_utc():
     with pytest.raises(ValidationError, match=r".*Input should have UTC timezone.*"):
         validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_naive)
+
+
+def test_datetime_like_YYYYmmdd_HHMM00_with_YYYYmmdd_HHMM00():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYYmmdd_HHMM00),
+    ]
+    validate_type("2001-02-03 04:05:00", validator)
+
+
+def test_datetime_like_YYYYmmdd_HHMM00_with_YYYYmmdd_HHMMSS():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYYmmdd_HHMM00),
+    ]
+    with pytest.raises(ValidationError, match=r'.*datetime must be "floored" to the first second.*'):
+        validate_type("2001-02-03 04:05:06", validator)
+
+
+def test_datetime_like_YYYYmmdd_HH0000_with_YYYYmmdd_HH0000():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYYmmdd_HH0000),
+    ]
+    validate_type("2001-02-03 04:00:00", validator)
+
+
+def test_datetime_like_YYYYmmdd_HH0000_with_YYYYmmdd_HHMMSS():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYYmmdd_HH0000),
+    ]
+    with pytest.raises(ValidationError, match=r'.*datetime must be "floored" to the first minute.*'):
+        validate_type("2001-02-03 04:05:06", validator)
+
+
+def test_datetime_like_YYYYmmdd_000000_with_YYYYmmdd_000000():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYYmmdd_000000),
+    ]
+    validate_type("2001-02-03 00:00:00", validator)
+
+
+def test_datetime_like_YYYYmmdd_000000_with_YYYYmmdd_HHMMSS():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYYmmdd_000000),
+    ]
+    with pytest.raises(ValidationError, match=r'.*datetime must be "floored" to the first hour.*'):
+        validate_type("2001-02-03 04:05:06", validator)
+
+
+def test_datetime_like_YYYYmm01_000000_with_YYYYmm01_000000():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYYmm01_000000),
+    ]
+    validate_type("2001-02-01 00:00:00", validator)
+
+
+def test_datetime_like_YYYYmm01_000000_with_YYYYmmdd_HHMMSS():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYYmm01_000000),
+    ]
+    with pytest.raises(ValidationError, match=r'.*datetime must be "floored" to the first day.*'):
+        validate_type("2001-02-03 04:05:06", validator)
+
+
+def test_datetime_like_YYYY0101_000000_with_YYYYmm01_000000():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYY0101_000000),
+    ]
+    validate_type("2001-01-01 00:00:00", validator)
+
+
+def test_datetime_like_YYYY0101_000000_with_YYYYmmdd_HHMMSS():
+    validator = Annotated[
+        datetime_like,
+        AfterValidator(dt_must_be_YYYY0101_000000),
+    ]
+    with pytest.raises(ValidationError, match=r'.*datetime must be "floored" to the first month.*'):
+        validate_type("2001-02-03 04:05:06", validator)
+
+
+def test_path_like_with_path():
+    p = Path("/tmp/foo/bar")
+    assert validate_type(p, path_like) == p
+
+
+def test_path_like_with_str():
+    p = Path("/tmp/foo/bar")
+    assert validate_type(str(p), path_like) == p

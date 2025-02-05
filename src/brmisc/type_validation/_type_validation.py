@@ -17,15 +17,16 @@ __all__ = [
 
 
 from typing import Annotated, Any
-from pydantic import (
-    validate_call, BeforeValidator, AfterValidator, TypeAdapter, ConfigDict,
-    Field, NaiveDatetime, AwareDatetime)
 import numbers
 import datetime
 from itertools import accumulate
+from pathlib import Path
+from pydantic import (
+    validate_call, BeforeValidator, AfterValidator, TypeAdapter, ConfigDict,
+    Field, NaiveDatetime, AwareDatetime)
 import numpy as np
 import pandas as pd
-from pathlib import Path
+
 
 
 # Note:
@@ -426,7 +427,7 @@ def get_dict_until(d: dict[Any, Any], key: Any) -> dict[Any, Any]:
     keys = list(d)[0: index + 1]
     values = list(d.values())[0: index + 1]
 
-    return {k: v for k, v in zip(keys, values)}
+    return dict(zip(keys, values))
 
 
 def raise_if_dt_is_not_floored_to_the_first(
@@ -434,7 +435,7 @@ def raise_if_dt_is_not_floored_to_the_first(
         units: str,
 ) -> datetime.datetime:
 
-    if (dt - dt.replace(**get_dict_until(DT_REPLACE_DICT, units))):
+    if dt - dt.replace(**get_dict_until(DT_REPLACE_DICT, units)):
         raise ValueError(f'datetime must be "floored" to the first {units}')
     return dt
 
@@ -476,7 +477,7 @@ def dt_must_be_YYYY0101_000000(dt: datetime.datetime) -> datetime.datetime:
 
 
 # -----------------------------------------------------------------------------
-# TODO: create timedelta validators.
+# @todo: create timedelta validators.
 # * maybe return a dateutil.relativedelta.relativedelta object as datetime.timedelta
 #   only accepts time deltas up to days.
 # * the validator should accept ISO8601 str (e.g. 'P3DT12H30M5S') using pydantic
@@ -502,7 +503,7 @@ path_like.__doc__ = (
     """
 )
 
-# TODO: create some more path types, e.g.:
+# @todo: create some more path types, e.g.:
 # * pydantic FilePath : must exist and be a file
 # * pydantic DirectoryPath: must exist and be a directory
 # * pydantic NewPath : must be new and parent exist (maybe turn off parent necessity)
