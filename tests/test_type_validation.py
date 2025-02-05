@@ -135,3 +135,37 @@ def test_type_validation_datetime_like_aware_with_naive():
 def test_type_validation_datetime_number():
     with pytest.raises(ValidationError, match=r".*Input should be a valid datetime.*"):
         validate_type(1.0, datetime_like)
+
+
+def test_type_validation_datetime_like_naive_or_utc_to_naive_with_naive():
+    dt_out = datetime.datetime(2001, 2, 3, 4, 5, 6)
+    dt_in = validate_type("2001-02-03 04:05:06", datetime_like_naive_or_utc_to_naive)
+    assert dt_in == dt_out
+
+
+def test_type_validation_datetime_like_naive_or_utc_to_naive_with_utc():
+    dt_out = datetime.datetime(2001, 2, 3, 4, 5, 6)
+    dt_in = validate_type("2001-02-03 04:05:06Z", datetime_like_naive_or_utc_to_naive)
+    assert dt_in == dt_out
+
+
+def test_type_validation_datetime_like_naive_or_utc_to_naive_with_non_utc():
+    with pytest.raises(ValidationError, match=r".*Input should have UTC timezone.*"):
+        validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_naive)
+
+
+def test_type_validation_datetime_like_naive_or_utc_to_utc_with_naive():
+    dt_out = datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
+    dt_in = validate_type("2001-02-03 04:05:06", datetime_like_naive_or_utc_to_utc)
+    assert dt_in == dt_out
+
+
+def test_type_validation_datetime_like_naive_or_utc_to_utc_with_utc():
+    dt_out = datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
+    dt_in = validate_type("2001-02-03 04:05:06Z", datetime_like_naive_or_utc_to_utc)
+    assert dt_in == dt_out
+
+
+def test_type_validation_datetime_like_naive_or_utc_to_utc_with_non_utc():
+    with pytest.raises(ValidationError, match=r".*Input should have UTC timezone.*"):
+        validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_naive)

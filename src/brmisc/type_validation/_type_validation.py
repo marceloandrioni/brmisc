@@ -245,14 +245,14 @@ def parse_timestr(value: Any) -> Any:
 
 def dt_naive_to_dt_utc(dt: datetime.datetime) -> datetime.datetime:
     if dt.tzinfo is None:
-        return dt.astimezone(datetime.timezone.utc)
+        return dt.replace(tzinfo=datetime.timezone.utc)
     return dt
 
 
 def dt_must_be_utc(dt: datetime.datetime) -> datetime.datetime:
     """Raise exception if datetime timezone is not UTC."""
     if dt.tzinfo.utcoffset(dt) != datetime.timedelta(0):
-        raise ValueError("datetime object must have UTC timezone")
+        raise ValueError("Input should have UTC timezone")
     return dt
 
 
@@ -360,7 +360,7 @@ datetime_like_naive_or_utc_to_utc.__doc__ = (
     Examples
     --------
     >>> validate_type("2001-02-03 04:05:06", datetime_like_naive_or_utc_to_utc)
-    datetime.datetime(2001, 2, 3, 6, 5, 6, tzinfo=datetime.timezone.utc)
+    datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
 
     >>> validate_type("2001-02-03 04:05:06Z", datetime_like_naive_or_utc_to_utc)
     datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
@@ -369,9 +369,8 @@ datetime_like_naive_or_utc_to_utc.__doc__ = (
     datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
 
     >>> validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_utc)
-      Value error, datetime object must have UTC timezone [type=value_error,
-    input_value=datetime.datetime(2001, 2...ays=-1, seconds=75600))),
-    input_type=datetime]
+      Value error, Input should have UTC timezone [type=value_error,
+    input_value='2001-02-03 04:05:06-03:00', input_type=str]
 
     """
 )
@@ -399,8 +398,9 @@ datetime_like_naive_or_utc_to_naive.__doc__ = (
     datetime.datetime(2001, 2, 3, 4, 5, 6)
 
     >>> validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_naive)
-      Value error, datetime object must have UTC timezone [type=value_error,
-    input_value='2001-02-03 04:05:06-03:00', input_type=str]
+      Value error, Input should have UTC timezone [type=value_error,
+    input_value=datetime.datetime(2001, 2...ays=-1, seconds=75600))),
+    input_type=datetime]
 
     """
 )
