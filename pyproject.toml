@@ -7,8 +7,27 @@ authors = [
     { name = "Marcelo Andrioni", email = "marceloandrioni@gmail.com" }
 ]
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "numpy>=2.2.2",
+    "pandas>=2.2.3",
+    "pydantic>=2.10.6",
+]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = ["-ra", "--showlocals", "--strict-markers", "--strict-config"]
+xfail_strict = true
+filterwarnings = [
+  "error",
+]
+log_cli_level = "INFO"
+testpaths = [
+  "tests",
+]
+pythonpath = [
+  ".", "src",
+]
