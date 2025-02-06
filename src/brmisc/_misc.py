@@ -162,7 +162,12 @@ class Outfile:
 
 class Timeit:
     @validate_types_in_func_call
-    def __init__(self, display_msg: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        display_msg: bool = True,
+        msg_template: Annotated[str, Field(pattern=r"\{time_delta\}")] = "Execution time: {time_delta}",
+    ) -> None:
         """
         A context manager for measuring the execution time of a block of code,
         with optional display of the elapsed time.
@@ -172,6 +177,9 @@ class Timeit:
         display_msg : bool, optional
             Whether to print the execution time message after the block has
             been executed. Defaults to True.
+        msg_template : str, optional
+            Message template. {time_delta} will be replaced by the actual
+            execution time.
 
         Examples
         --------
@@ -180,9 +188,15 @@ class Timeit:
         ...     time.sleep(2)
         Execution time: 0:00:02.000123
 
+        >>> with Timeit(msg_template="with block took: {time_delta}") as timer:
+        ...     # Simulate some workload
+        ...     time.sleep(2)
+        with block took: 0:00:02.012325
+
         """
 
         self.display_msg = display_msg
+        self.msg_template = msg_template
         self.dt_start: datetime.datetime | None = None
         self.dt_stop: datetime.datetime | None = None
         self.time_delta: datetime.timedelta | None = None
@@ -204,7 +218,7 @@ class Timeit:
             print(f"Error after: {self.time_delta}", file=sys.stderr)
             raise exc_val
 
-        print(f"Execution time: {self.time_delta}")
+        print(self.msg_template.format(time_delta=self.time_delta))
 
 
 def timeit(f: Callable) -> Callable:
