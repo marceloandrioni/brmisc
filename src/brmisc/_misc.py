@@ -1,14 +1,17 @@
 __all__ = [
     "random_str",
+    "Outfile",
     "timeit",
 ]
 
-from typing import Callable
+from typing import Callable, Annotated
 import random
 import string
 from functools import wraps
-from time import time
+import datetime
+from pathlib import Path
 
+from pydantic import Field
 from .type_validation import validate_types_in_func_call
 
 
@@ -51,7 +54,106 @@ def random_str(
     if digits:
         sample_space += string.digits
 
-    return ''.join(random.choices(sample_space, k=n))
+    return "".join(random.choices(sample_space, k=n))
+
+
+class Outfile:
+    # @todo: option to check if the file type is correct using magic or a func, e.g.:
+    #
+    # Outfile(..., check_file="netcdf")
+    #
+    # def my_func(file):
+    #     with xr.open_dataset(file) as ds:
+    #         if len(ds["time"]) < 24:
+    #             raise ValueError()
+    #
+    # Outfile(..., check_file=my_func)
+
+    @validate_types_in_func_call
+    def __init__(
+        self,
+        path: str | Path,
+        *,
+        overwrite: bool = False,
+        use_temporary_file: bool = True,
+        delete_temporary_file_on_error: bool = True,
+        mandatory_extension: Annotated[str, Field(pattern=r"^\.[a-zA-Z0-9]+")]
+        | None = None,
+    ) -> None:
+        """A context manager for safely handling file creation, optionally using
+        a temporary file during the process. This class ensures that the target
+        file is only finalized once the operations inside the context block are
+        successful.
+
+        Parameters
+        ----------
+        path : str | Path
+            The path where the output file will be created.
+        overwrite : bool, optional
+            Whether to overwrite the target file if it already exists.
+            Defaults to False.
+        use_temporary_file : bool, optional
+            Whether to use a temporary file before finalizing the output file.
+            Defaults to True.
+        delete_temporary_file_on_error : bool, optional
+            If an error occurs during the context block, deletes the temporary
+            file. Defaults to True.
+        mandatory_extension : str or None, optional
+            Enforces a specific file extension for the output file.
+
+        Examples
+        --------
+        Use `Outfile` to safely create a file, leveraging a temporary file for
+        atomic writes:
+
+        >>> with Outfile("/tmp/some/dir/myfile.txt") as outfile:
+        ...     with open(outfile, "w") as fp:
+        ...         print(f"Writing data to temporary file: {outfile}")
+        ...         fp.write("Hello!")
+
+        After the context block completes successfully, the temporary file (if
+        used) will be renamed to the final target file. If an error occurs, the
+        temporary file will be deleted (if `delete_temporary_file_on_error` is True).
+
+        """
+
+        self.path = Path(path)
+        self.overwrite = overwrite
+        self.use_temporary_file = use_temporary_file
+        self.delete_temporary_file_on_error = delete_temporary_file_on_error
+
+        if mandatory_extension and mandatory_extension != self.path.suffix:
+            raise ValueError(
+                f"File '{self.path}' does not have the mandatory extension '{mandatory_extension}'"
+            )
+
+    def __enter__(self) -> Path:
+        if self.path.exists() and not self.overwrite:
+            raise ValueError(f"File '{self.path}' exists.")
+
+        # create parent dir if it doesn't exist
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+
+        self._temp = self.path
+        if self.use_temporary_file:
+            self._temp = self.path.with_suffix(
+                f".tmp{random_str()}{self.path.suffix}"
+            )
+
+        return self._temp
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if exc_val is not None:
+            if self.delete_temporary_file_on_error:
+                self._temp.unlink()
+            raise exc_val
+
+        # another process may have created self.path while the with block
+        # was being executed, so check again if file exits.
+        if self.path.exists() and not self.overwrite:
+            raise ValueError(f"File {self.path} exists.")
+
+        self._temp.rename(self.path)
 
 
 def timeit(f: Callable) -> Callable:
@@ -66,26 +168,27 @@ def timeit(f: Callable) -> Callable:
     ...     time.sleep(sleep)
     >>> hello("Hello World", sleep=1)
     Hello World.
-    hello('Hello World', sleep=1) : running time of 1.01 seconds
+    hello('Hello World', sleep=1) : running time : 0:00:01.004670
 
     """
 
     @wraps(f)
     def wrap(*args, **kwargs):
-
-        t_start = time.time()
+        # Note: datetime.datetime.utcnow is deprecated and will be removed
+        dt_start = datetime.datetime.now(datetime.timezone.utc)
         result = f(*args, **kwargs)
-        t_stop = time.time()
+        dt_stop = datetime.datetime.now(datetime.timezone.utc)
+        td = dt_stop - dt_start
 
         # string representation for args and kwargs
-        # Note: repr(x) is better than str(x) because represents string between quotes
+        # Note: repr(x) is better than str(x) because shows string between quotes
         args_lst = [repr(x) for x in args]
         kwargs_lst = [f"{k}={repr(v)}" for k, v in kwargs.items()]
         args_str = ", ".join(args_lst + kwargs_lst)
 
-        msg = (f"{f.__name__}({args_str}) : running time of"
-               f" {t_stop - t_start:.2f} seconds")
+        msg = f"{f.__name__}({args_str}) : running time : {td}"
         print(msg)
 
         return result
+
     return wrap
