@@ -1,4 +1,5 @@
 __all__ = [
+    "kwargs2attrs",
     "random_str",
     "Outfile",
     "Timeit",
@@ -13,9 +14,44 @@ import string
 from functools import wraps
 import datetime
 from pathlib import Path
+import pprint
+import re
 
 from pydantic import Field
 from .type_validation import validate_types_in_func_call
+
+
+class kwargs2attrs:
+
+    def __init__(self, **kwargs) -> None:
+        """
+        A utility class to dynamically convert keyword arguments (kwargs) into instance attributes.
+
+        Parameters
+        ----------
+        **kwargs : Any
+            Arbitrary keyword arguments used to populate instance attributes.
+
+        Examples
+        --------
+        >>> obj = kwargs2attrs(name="John", age=30)
+        >>> obj.name
+        'John'
+        >>> obj.age
+        30
+
+        """
+
+        # allow only names starting with a-zA-Z or underscore (_)
+        pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
+        for kwarg in kwargs:
+            if not re.fullmatch(pattern, kwarg):
+                raise ValueError(f"string '{kwarg}' cant be used as a attribute name")
+
+        self.__dict__.update(**kwargs)
+
+    def __repr__(self) -> str:
+        return pprint.pformat(self.__dict__)
 
 
 @validate_types_in_func_call
@@ -161,6 +197,7 @@ class Outfile:
 
 
 class Timeit:
+
     @validate_types_in_func_call
     def __init__(
         self,
