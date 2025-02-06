@@ -1,9 +1,12 @@
 __all__ = [
     "random_str",
     "Outfile",
+    "Timeit",
     "timeit",
 ]
 
+
+import sys
 from typing import Callable, Annotated
 import random
 import string
@@ -58,6 +61,7 @@ def random_str(
 
 
 class Outfile:
+
     # @todo: option to check if the file type is correct using magic or a func, e.g.:
     #
     # Outfile(..., check_file="netcdf")
@@ -156,8 +160,55 @@ class Outfile:
         self._temp.rename(self.path)
 
 
+class Timeit:
+    @validate_types_in_func_call
+    def __init__(self, display_msg: bool = True) -> None:
+        """
+        A context manager for measuring the execution time of a block of code,
+        with optional display of the elapsed time.
+
+        Parameters
+        ----------
+        display_msg : bool, optional
+            Whether to print the execution time message after the block has
+            been executed. Defaults to True.
+
+        Examples
+        --------
+        >>> with Timeit() as timer:
+        ...     # Simulate some workload
+        ...     time.sleep(2)
+        Execution time: 0:00:02.000123
+
+        """
+
+        self.display_msg = display_msg
+        self.dt_start: datetime.datetime | None = None
+        self.dt_stop: datetime.datetime | None = None
+        self.time_delta: datetime.timedelta | None = None
+
+    @staticmethod
+    def _utcnow() -> datetime.datetime:
+        # Note: datetime.datetime.utcnow is deprecated and will be removed
+        return datetime.datetime.now(datetime.timezone.utc)
+
+    def __enter__(self) -> None:
+        self.dt_start = self._utcnow()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        self.dt_stop = self._utcnow()
+        self.time_delta = self.dt_stop - self.dt_start
+
+        if exc_val is not None:
+            print(f"Error after: {self.time_delta}", file=sys.stderr)
+            raise exc_val
+
+        print(f"Execution time: {self.time_delta}")
+
+
 def timeit(f: Callable) -> Callable:
-    """Decorator to get the execution time of a function.
+    """Decorator to measure the execution time of a function.
 
     Examples
     --------
@@ -167,18 +218,14 @@ def timeit(f: Callable) -> Callable:
     ...     print(msg)
     ...     time.sleep(sleep)
     >>> hello("Hello World", sleep=1)
-    Hello World.
-    hello('Hello World', sleep=1) : running time : 0:00:01.004670
+    Running function: hello('Hello World', sleep=1)
+    Hello World
+    Execution time: 0:00:01.005325
 
     """
 
     @wraps(f)
     def wrap(*args, **kwargs):
-        # Note: datetime.datetime.utcnow is deprecated and will be removed
-        dt_start = datetime.datetime.now(datetime.timezone.utc)
-        result = f(*args, **kwargs)
-        dt_stop = datetime.datetime.now(datetime.timezone.utc)
-        td = dt_stop - dt_start
 
         # string representation for args and kwargs
         # Note: repr(x) is better than str(x) because shows string between quotes
@@ -186,8 +233,9 @@ def timeit(f: Callable) -> Callable:
         kwargs_lst = [f"{k}={repr(v)}" for k, v in kwargs.items()]
         args_str = ", ".join(args_lst + kwargs_lst)
 
-        msg = f"{f.__name__}({args_str}) : running time : {td}"
-        print(msg)
+        print(f"Running function: {f.__name__}({args_str})")
+        with Timeit() as _:
+            result = f(*args, **kwargs)
 
         return result
 
