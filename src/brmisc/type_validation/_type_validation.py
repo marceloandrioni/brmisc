@@ -14,7 +14,6 @@ __all__ = [
     "dt_must_be_YYYY0101_000000",   # rounded to 1st day of year
     "timedelta_like",
     "path_like",
-    "path_like_absolute",
 ]
 
 
@@ -584,23 +583,6 @@ path_like.__doc__ = (
 
     >>> validate_type("/tmp/foo/bar", path_like)
     PosixPath('/tmp/foo/bar')
-
-    """
-)
-
-
-def relative_path_to_absolute(path: Path) -> Path:
-    return path.expanduser().absolute()
-
-
-path_like_absolute = Annotated[path_like, AfterValidator(relative_path_to_absolute)]
-path_like_absolute.__doc__ = (
-    """Same as path_like, but return an absolute path.
-
-    Examples
-    --------
-    >>> validate_type("foo/bar", path_like_absolute)
-    PosixPath('/home/user/foo/bar')
 
     """
 )
