@@ -14,6 +14,8 @@ __all__ = [
     "dt_must_be_YYYY0101_000000",   # rounded to 1st day of year
     "timedelta_like",
     "path_like",
+    "file_path_like",
+    "directory_path_like",
 ]
 
 
@@ -25,7 +27,7 @@ from itertools import accumulate
 from pathlib import Path
 from pydantic import (
     validate_call, BeforeValidator, AfterValidator, TypeAdapter, ConfigDict,
-    Field, NaiveDatetime, AwareDatetime)
+    Field, NaiveDatetime, AwareDatetime, FilePath, DirectoryPath)
 import numpy as np
 import pandas as pd
 
@@ -588,9 +590,23 @@ path_like.__doc__ = (
 )
 
 
-# @todo: create some more path types, e.g.:
-# * pydantic FilePath : must exist and be a file
-# * pydantic DirectoryPath: must exist and be a directory
-# * pydantic NewPath : must be new and parent exist (maybe turn off parent necessity)
-# * Path_must_be_overwritable
-# * check https://github.com/xfrenette/pathtype for ideas
+file_path_like = Annotated[FilePath, Field(strict=False)]
+file_path_like.__doc__ = (
+    """Type alias to validate file_path_like (Path, str, etc) and coerce it to path.
+
+    The path must point to an existing file. This is useful to make sure a file
+    that will be read from exists.
+
+    """
+)
+
+
+directory_path_like = Annotated[DirectoryPath, Field(strict=False)]
+directory_path_like.__doc__ = (
+    """Type alias to validate directory_path_like (Path, str, etc) and coerce it to path.
+
+    The path must point to an existing directory. This is useful to make sure a
+    direcotry that will be read from exists.
+
+    """
+)
