@@ -12,6 +12,7 @@ __all__ = [
     "dt_must_be_YYYYmmdd_000000",   # rounded to midnight
     "dt_must_be_YYYYmm01_000000",   # rounded to 1st day of month
     "dt_must_be_YYYY0101_000000",   # rounded to 1st day of year
+    "timedelta_like",
     "path_like",
     "path_like_absolute",
 ]
@@ -20,6 +21,7 @@ __all__ = [
 from typing import Annotated, Any
 import numbers
 import datetime
+from dateutil.relativedelta import relativedelta
 from itertools import accumulate
 from pathlib import Path
 from pydantic import (
@@ -477,14 +479,97 @@ def dt_must_be_YYYY0101_000000(dt: datetime.datetime) -> datetime.datetime:
 
 
 # -----------------------------------------------------------------------------
-# @todo: create timedelta validators.
-# * maybe return a dateutil.relativedelta.relativedelta object as datetime.timedelta
-#   only accepts time deltas up to days.
-# * the validator should accept ISO8601 str (e.g. 'P3DT12H30M5S') using pydantic
-#   https://docs.pydantic.dev/latest/api/standard_library_types/#datetimetimedelta
-# * maybe accept datetime.timedelta, ISO8601 str and dict (e.g.: {"months":2, "days"=3})
-#   and coerce everything to dateutil.relativedelta.relativedelta
-# * accept int/float as seconds
+def any_to_relativedelta(value: Any) -> Any:
+
+    # https://docs.python.org/3/library/datetime.html#datetime.timedelta
+    #
+    # timedelta fields will accept values of type:
+    #     timedelta; an existing timedelta object
+    #     int or float; assumed to be in seconds
+    #     str; the following formats are accepted:
+    #         [-][[DD]D,]HH:MM:SS[.ffffff]
+    #             Ex: '1d,01:02:03.000004' or '1D01:02:03.000004' or '01:02:03'
+    #         [±]P[DD]DT[HH]H[MM]M[SS]S (ISO 8601 format for timedelta)
+
+    valid_types = (
+        datetime.timedelta,
+        numbers.Number,
+        str,
+    )
+
+    if isinstance(value, valid_types):
+        td = TypeAdapter(datetime.timedelta).validate_python(value)
+        return relativedelta(seconds=td.total_seconds())
+
+    return value
+
+
+def dict_to_relativedelta(value: Any) -> Any:
+
+    valid_units = {
+        "years",
+        "months",
+        "weeks",
+        "days",
+        "hours",
+        "minutes",
+        "seconds",
+        "microseconds",
+    }
+
+    if isinstance(value, dict):
+
+        if not set(value).issubset(valid_units):
+            raise ValueError("Invalid time unit. Must be one of: "
+                             + ", ".join(valid_units))
+
+        return relativedelta(**value)
+    return value
+
+
+timedelta_like = Annotated[
+    relativedelta,
+    BeforeValidator(dict_to_relativedelta),
+    BeforeValidator(any_to_relativedelta),
+]
+timedelta_like.__doc__ = (
+    """Type alias to validate timedelta_like (timedelta, str, float, etc) and
+    coerce it to relativedelta.
+
+    dateutil.relativedelta.relativedelta is prefered to datetime.timedelta
+    because it can store non fixed time duration intervals, e.g.:
+    months (28/29/30/31 days), years (365/366 days).
+
+    Valid formats:
+        * dateutil.relativedelta.relativedelta
+        * datetime.timedelta
+        * str:
+            [-][[DD]D,]HH:MM:SS[.ffffff], e.g: '1D01:02:03.000004'
+            [±]P[DD]DT[HH]H[MM]M[SS]S (ISO 8601), e.g.: 'P3DT12H30M5S'
+        * Number: assumed to be in seconds
+        * dict with keywords "years", "months", "weeks", "days", "hours",
+            "minutes", "seconds", "microseconds".
+
+    Examples
+    --------
+    >>> validate_type(datetime.timedelta(hours=2, seconds=-1), timedelta_like)
+    relativedelta(hours=+1, minutes=+59, seconds=+59)
+
+    >>> validate_type(86400, timedelta_like)
+    relativedelta(days=+1)
+
+    >>> validate_type("1d,01:02:03", timedelta_like)
+    relativedelta(days=+1, hours=+1, minutes=+2, seconds=+3)
+
+    >>> validate_type("P3DT12H30M5S", timedelta_like)
+    relativedelta(days=+3, hours=+12, minutes=+30, seconds=+5)
+
+    >>> validate_type({"months": 2, "hours":-12}, timedelta_like)
+    relativedelta(months=+2, hours=-12)
+
+    """
+)
+
 
 # -----------------------------------------------------------------------------
 # set strict=False to allow coercion from string

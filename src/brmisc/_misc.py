@@ -221,12 +221,10 @@ class Timeit:
         Examples
         --------
         >>> with Timeit() as timer:
-        ...     # Simulate some workload
         ...     time.sleep(2)
         Execution time: 0:00:02.000123
 
         >>> with Timeit(msg_template="with block took: {time_delta}") as timer:
-        ...     # Simulate some workload
         ...     time.sleep(2)
         with block took: 0:00:02.012325
 
