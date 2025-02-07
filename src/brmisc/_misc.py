@@ -4,11 +4,13 @@ __all__ = [
     "Outfile",
     "Timeit",
     "timeit",
+    "evaluate_operation",
+    "raise_if_operation_is_false",
 ]
 
 
 import sys
-from typing import Callable, Annotated
+from typing import Callable, Annotated, Any, Literal
 import random
 import string
 from functools import wraps
@@ -16,6 +18,7 @@ import datetime
 from pathlib import Path
 import pprint
 import re
+import operator
 
 from pydantic import Field
 from .type_validation import validate_types_in_func_call
@@ -289,3 +292,126 @@ def timeit(f: Callable) -> Callable:
         return result
 
     return wrap
+
+
+@validate_types_in_func_call
+def evaluate_operation(
+    left_side_value: Any,
+    operation: Literal["==", "!=", ">", ">=", "<", "<="],
+    right_side_value: Any,
+    /,
+) -> bool:
+    """
+    Evaluate a comparison operation between two values.
+
+    This function takes two values and a specified comparison operation,
+    and returns the result of the operation as a boolean.
+
+    Parameters:
+    ----------
+    left_side_value : Any
+        The value on the left side of the comparison.
+    operation : str
+        A string representing the comparison operation to be performed.
+        Supported operations are:
+            - "==": equal to
+            - "!=": not equal to
+            - ">": greater than
+            - ">=": greater than or equal to
+            - "<": less than
+            - "<=": less than or equal to
+    right_side_value : Any
+        The value on the right side of the comparison.
+
+    Returns:
+    -------
+    bool
+        The result of the comparison operation. Returns True if the
+        comparison is valid, otherwise returns False.
+
+    Example:
+    --------
+    >>> evaluate_operation(5, ">", 3)
+    True
+
+    >>> evaluate_operation(4, "==", 5)
+    False
+
+    """
+
+    operations = {
+        "==": operator.eq,
+        "!=": operator.ne,
+        ">": operator.gt,
+        ">=": operator.ge,
+        "<": operator.lt,
+        "<=": operator.le,
+    }
+
+    return operations[operation](left_side_value, right_side_value)
+
+
+@validate_types_in_func_call
+def raise_if_operation_is_false(
+    left_side_name: str,
+    left_side_value: Any,
+    operation: Literal["==", "!=", ">", ">=", "<", "<="],
+    right_side_name: str,
+    right_side_value: Any,
+    /,
+) -> None:
+    """
+    Raise a ValueError if the specified comparison operation evaluates to False.
+
+    This function takes two values along with their names and a specified
+    comparison operation. If the operation evaluates to False, it raises
+    a ValueError with a message indicating the nature of the failure.
+
+    Parameters:
+    ----------
+    left_side_name : str
+        The name of the left side value, used for error reporting.
+    left_side_value : Any
+        The value on the left side of the comparison.
+    operation : str
+        A string representing the comparison operation to be performed.
+        Supported operations are:
+            - "==": equal to
+            - "!=": not equal to
+            - ">": greater than
+            - ">=": greater than or equal to
+            - "<": less than
+            - "<=": less than or equal to
+    right_side_name : str
+        The name of the right side value, used for error reporting.
+    right_side_value : Any
+        The value on the right side of the comparison.
+
+    Returns:
+    -------
+    None
+        The function does not return any value. It either completes
+        successfully or raises a ValueError.
+
+    Raises:
+    -------
+    ValueError
+        If the comparison operation evaluates to False, a ValueError
+        is raised with a message indicating the names of the values
+        involved in the operation.
+
+    Example:
+    --------
+    >>> raise_if_operation_is_false("a", 5, ">", "b", 3)  # No exception
+    >>> raise_if_operation_is_false("a", 5, "<", "b", 3)
+    ValueError: Operation 'a' < 'b' is False
+
+    """
+
+    if evaluate_operation(left_side_value, operation, right_side_value):
+        return
+
+    # Note: left/rigth_side_values can be anything, so don't shown the values
+    # in the error message, only the names
+    err_msg = f"Operation '{left_side_name}' {operation} '{right_side_name}' is False"
+    raise ValueError(err_msg)
