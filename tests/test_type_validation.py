@@ -1,5 +1,6 @@
 from typing import Annotated
 import datetime
+from dateutil.relativedelta import relativedelta
 from pathlib import Path
 import pytz
 import pytest
@@ -23,6 +24,7 @@ from brmisc.type_validation import (
     dt_must_be_YYYYmmdd_000000,
     dt_must_be_YYYYmm01_000000,
     dt_must_be_YYYY0101_000000,
+    timedelta_like,
     path_like,
 )
 
@@ -279,6 +281,46 @@ def test_datetime_like_YYYY0101_000000_with_YYYYmmdd_HHMMSS():
     ]
     with pytest.raises(ValidationError, match=r'.*datetime must be "floored" to the first month.*'):
         validate_type("2001-02-03 04:05:06", validator)
+
+
+def test_timedelta_like_with_relativedelta():
+    td_out = relativedelta(days=1, seconds=-1)
+    td_in = relativedelta(days=1, seconds=-1)
+    assert validate_type(td_in, timedelta_like) == td_out
+
+
+def test_timedelta_like_with_timedelta():
+
+    # Note: with relativedelta the same time interval can be shown in differrent
+    # ways, e.g.;
+    # relativedelta(hours=+23, minutes=+59, seconds=+59) != relativedelta(days=+1, seconds=-1)
+    # so add it to a date to make sure it is the actually the same
+    dt = datetime.datetime(2001, 1, 1)
+
+    td_out = relativedelta(days=1, seconds=-1)
+    td_in = datetime.timedelta(days=1, seconds=-1)
+    assert validate_type(td_in, timedelta_like) + dt == td_out + dt
+
+
+def test_timedelta_like_with_str():
+    dt = datetime.datetime(2001, 1, 1)
+    td_out = relativedelta(days=1, hours=2, minutes=3, seconds=4)
+    td_in = "1d,02:03:04"
+    assert validate_type(td_in, timedelta_like) + dt == td_out + dt
+
+
+def test_timedelta_like_with_str_8601():
+    dt = datetime.datetime(2001, 1, 1)
+    td_out = relativedelta(days=1, hours=2, minutes=3, seconds=4)
+    td_in = "P1DT2H3M4S"
+    assert validate_type(td_in, timedelta_like) + dt == td_out + dt
+
+
+def test_timedelta_like_with_dict():
+    dt = datetime.datetime(2001, 1, 1)
+    td_out = relativedelta(days=1, seconds=-1)
+    td_in = {"days": 1, "seconds": -1}
+    assert validate_type(td_in, timedelta_like) + dt == td_out + dt
 
 
 def test_path_like_with_path():
