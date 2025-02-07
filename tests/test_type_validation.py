@@ -3,12 +3,12 @@ import datetime
 from dateutil.relativedelta import relativedelta
 from pathlib import Path
 import pytz
+import tempfile
+
 import pytest
+from pydantic import ValidationError, AfterValidator
 import numpy as np
 import pandas as pd
-
-
-from pydantic import ValidationError, AfterValidator
 
 from brmisc.type_validation import (
     validate_types_in_func_call,
@@ -26,6 +26,8 @@ from brmisc.type_validation import (
     dt_must_be_YYYY0101_000000,
     timedelta_like,
     path_like,
+    file_path_like,
+    directory_path_like,
 )
 
 
@@ -331,3 +333,37 @@ def test_path_like_with_path():
 def test_path_like_with_str():
     p = Path("/tmp/foo/bar")
     assert validate_type(str(p), path_like) == p
+
+
+def test_file_path_like_with_file():
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=False) as temp_file:
+        temp_file.write("Hello World!")
+        name = temp_file.name
+
+    assert validate_type(name, file_path_like) == Path(name)
+    Path(name).unlink()
+
+
+def test_file_path_like_with_missing_file():
+
+    with tempfile.NamedTemporaryFile(mode="w", delete=True) as temp_file:
+        temp_file.write("Hello World!")
+        name = temp_file.name
+
+    with pytest.raises(ValidationError, match=r'.*Path does not point to a file.*'):
+        validate_type(name, file_path_like)
+
+
+def test_directory_path_like_with_directory():
+    with tempfile.TemporaryDirectory() as temp_dir:
+        assert validate_type(temp_dir, directory_path_like) == Path(temp_dir)
+
+
+def test_directory_path_like_with_missing_directory():
+
+    with tempfile.TemporaryDirectory() as temp_dir:
+        pass
+
+    with pytest.raises(ValidationError, match=r'.*Path does not point to a directory.*'):
+        validate_type(temp_dir, directory_path_like)
