@@ -6,7 +6,7 @@ __all__ = [
     "timeit",
     "evaluate_operation",
     "raise_if_operation_is_false",
-    "ListOfObjs"
+    "ListOfObjs",
 ]
 
 
@@ -442,41 +442,43 @@ class ListOfObjs(list):
     --------
 
     >>> @dataclass
-    ... class Foo:
+    ... class Student:
     ...     name: str
     ...     age: int
 
     >>> @dataclass
-    ... class Bar:
+    ... class Teacher:
     ...     name: str
     ...     age: int
 
-    >>> foo1 = Foo("id1", 10)
-    >>> foo2 = Foo("id2", 11)
-    >>> foo3 = Foo("id1", 12)
-    >>> bar1 = Bar("bar1", 13)
+    >>> student1 = Student("John", 10)
+    >>> student2 = Student("Bob", 11)
+    >>> student3 = Student("John", 12)
+    >>> teacher1 = Teacher("Mary", 30)
 
     Initialize ListOfObjs with an Iterable:
 
-    >>> foos = ListOfObjs((foo1, foo2), id_field="name")
+    >>> students = ListOfObjs((student1, student2), id_field="name")
 
     Initialize a empty ListOfObjs and then append
 
-    >>> foos = ListOfObjs(id_field="name", class_def=Foo)
-    >>> foos.append(foo1)
-    >>> foos.append(foo1)
+    >>> students = ListOfObjs(id_field="name", class_def=Student)
+    >>> students.append(student1)
+    >>> students.append(student2)
 
-    >>> foos = ListOfObjs((foo1, foo2, foo3), id_field="name")
-    ValueError: Values in attribute 'name' must be unique. Value 'id1' already
+    >>> students = ListOfObjs((student1, student2, student3), id_field="name")
+    ValueError: Values in attribute 'name' must be unique. Value 'John' already
         exists.
 
-    >>> foos = ListOfObjs((foo1, foo2, foo3), id_field="name", unique=False)
+    >>> students = ListOfObjs((student1, student2, student3), id_field="name", unique=False)
 
-    >>> foos = ListOfObjs((foo1, foo2, bar1), id_field="name")
-    ValueError: Object must be of type 'Foo'
+    >>> students = ListOfObjs((student1, student2, teacher1), id_field="name")
+    ValueError: Object must be of type 'Student'
 
     """
 
+    # Note: use iterable: Sequence[T] instead of iterable: Iterable[T] due to
+    # https://github.com/pydantic/pydantic/issues/9541
     @validate_types_in_func_call
     def __init__(
         self,
