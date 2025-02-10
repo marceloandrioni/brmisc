@@ -297,7 +297,7 @@ def timeit(f: Callable) -> Callable:
 @validate_types_in_func_call
 def evaluate_operation(
     left_side_value: Any,
-    operation: Literal["==", "!=", ">", ">=", "<", "<="],
+    operation: Literal["==", "!=", ">", ">=", "<", "<=", "is", "is not"],
     right_side_value: Any,
     /,
 ) -> bool:
@@ -320,6 +320,8 @@ def evaluate_operation(
             - ">=": greater than or equal to
             - "<": less than
             - "<=": less than or equal to
+            - "is"
+            - "is not"
     right_side_value : Any
         The value on the right side of the comparison.
 
@@ -346,6 +348,8 @@ def evaluate_operation(
         ">=": operator.ge,
         "<": operator.lt,
         "<=": operator.le,
+        "is": operator.is_,
+        "is not": operator.is_not,
     }
 
     return operations[operation](left_side_value, right_side_value)
@@ -355,7 +359,7 @@ def evaluate_operation(
 def raise_if_operation_is_false(
     left_side_name: str,
     left_side_value: Any,
-    operation: Literal["==", "!=", ">", ">=", "<", "<="],
+    operation: Literal["==", "!=", ">", ">=", "<", "<=", "is", "is not"],
     right_side_name: str,
     right_side_value: Any,
     /,
@@ -382,6 +386,8 @@ def raise_if_operation_is_false(
             - ">=": greater than or equal to
             - "<": less than
             - "<=": less than or equal to
+            - "is"
+            - "is not"
     right_side_name : str
         The name of the right side value, used for error reporting.
     right_side_value : Any
@@ -460,6 +466,9 @@ class ListOfObjs(list):
 
     >>> students = ListOfObjs((student1, student2), id_field="name")
 
+    >>> students = ListOfObjs((student1, student2, teacher1), id_field="name")
+    ValueError: Object must be of type 'Student'
+
     Initialize a empty ListOfObjs and then append
 
     >>> students = ListOfObjs(id_field="name", class_def=Student)
@@ -471,9 +480,6 @@ class ListOfObjs(list):
         exists.
 
     >>> students = ListOfObjs((student1, student2, student3), id_field="name", unique=False)
-
-    >>> students = ListOfObjs((student1, student2, teacher1), id_field="name")
-    ValueError: Object must be of type 'Student'
 
     """
 
