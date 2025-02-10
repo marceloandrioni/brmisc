@@ -6,11 +6,12 @@ __all__ = [
     "timeit",
     "evaluate_operation",
     "raise_if_operation_is_false",
+    "ListOfObjs"
 ]
 
 
 import sys
-from typing import Callable, Annotated, Any, Literal
+from typing import Callable, Annotated, Any, Literal, Sequence, TypeVar
 import random
 import string
 from functools import wraps
@@ -120,8 +121,7 @@ class Outfile:
         overwrite: bool = False,
         use_temporary_file: bool = True,
         delete_temporary_file_on_error: bool = True,
-        mandatory_extension: Annotated[str, Field(pattern=r"^\.[a-zA-Z0-9]+")]
-        | None = None,
+        mandatory_extension: Annotated[str, Field(pattern=r"^\.[a-zA-Z0-9]+")] | None = None,
     ) -> None:
         """A context manager for safely handling file creation, optionally using
         a temporary file during the process. This class ensures that the target
@@ -415,3 +415,154 @@ def raise_if_operation_is_false(
     # in the error message, only the names
     err_msg = f"Operation '{left_side_name}' {operation} '{right_side_name}' is False"
     raise ValueError(err_msg)
+
+
+T = TypeVar("T")
+
+
+class ListOfObjs(list):
+    """
+    A custom list implementation that holds objects of a specified class type
+    and ensures that each object has a specific attribute (id_field).
+
+    Parameters:
+    ----------
+    iterable : Sequence (int, tuple, etc) or None
+    id_field : str
+        The name of the attribute that should be present in each object.
+    class_def : class or None
+        An optional class definition that specifies the type
+        of objects to be stored in the list. If not provided, the type will
+        be inferred from the first item in the iterable.
+    unique : bool
+        A flag indicating whether the values of id_field must be unique in the list.
+        Defaults to True.
+
+    Example:
+    --------
+
+    >>> @dataclass
+    ... class Foo:
+    ...     name: str
+    ...     age: int
+
+    >>> @dataclass
+    ... class Bar:
+    ...     name: str
+    ...     age: int
+
+    >>> foo1 = Foo("id1", 10)
+    >>> foo2 = Foo("id2", 11)
+    >>> foo3 = Foo("id1", 12)
+    >>> bar1 = Bar("bar1", 13)
+
+    Initialize ListOfObjs with an Iterable:
+
+    >>> foos = ListOfObjs((foo1, foo2), id_field="name")
+
+    Initialize a empty ListOfObjs and then append
+
+    >>> foos = ListOfObjs(id_field="name", class_def=Foo)
+    >>> foos.append(foo1)
+    >>> foos.append(foo1)
+
+    >>> foos = ListOfObjs((foo1, foo2, foo3), id_field="name")
+    ValueError: Values in attribute 'name' must be unique. Value 'id1' already
+        exists.
+
+    >>> foos = ListOfObjs((foo1, foo2, foo3), id_field="name", unique=False)
+
+    >>> foos = ListOfObjs((foo1, foo2, bar1), id_field="name")
+    ValueError: Object must be of type 'Foo'
+
+    """
+
+    @validate_types_in_func_call
+    def __init__(
+        self,
+        iterable: Sequence[T] | None = None,
+        *,
+        id_field: Annotated[str, Field(pattern=r"^[a-zA-Z_][a-zA-Z0-9_]*$")],
+        class_def: T | None = None,
+        unique: bool = True,
+    ) -> None:
+
+        self._id_field = id_field
+
+        if not any((iterable, class_def)):
+            raise ValueError("iterable OR class_def must be given")
+
+        # get type from class_def or from the first item in iterable
+        #
+        # Note: hasattr(class_def, id_field) returns False for classes
+        # defined with dataclass, pydantic.BaseModel, etc. Therefore, the
+        # presence of attribute id_field should be checked in the intances
+        self._class_def = type(next(iter(iterable))) if class_def is None else class_def
+
+        self._unique = unique
+
+        super().__init__([])
+        for item in iterable or []:
+            self.append(item)
+
+    def __repr__(self) -> list[Any]:
+        return self.ids.__repr__()
+
+    def _validate_item(self, item: T) -> None:
+
+        if not isinstance(item, self._class_def):
+            raise ValueError(f"Object must be of type '{self._class_def.__name__}'")
+
+        if not hasattr(item, self._id_field):
+            raise ValueError(f"Object must have attribute '{self._id_field}'")
+
+        if not self._unique:
+            return
+
+        id_item = getattr(item, self._id_field)
+        ids = self.ids + [id_item]
+        if ids.count(id_item) > 1:
+            err_msg = (
+                f"Values in attribute '{self._id_field}' must be unique."
+                f" Value '{id_item}' already exists."
+            )
+            raise ValueError(err_msg)
+
+    def __setitem__(self, index: int, item: T) -> None:
+        self._validate_item(item)
+        super().__setitem__(index, item)
+
+    def append(self, item: T) -> None:
+        self._validate_item(item)
+        super().append(item)
+
+    def count(self, value: Any) -> int:
+        return self.ids.count(value)
+
+    def extend(self, iterable: Sequence) -> None:
+        for item in iterable:
+            self.append(item)
+
+    def index(self, value: Any) -> int:
+        return self.ids.index(value)
+
+    def insert(self, index: int, item: T) -> None:
+        self._validate_item(item)
+        super().insert(index, item)
+
+    def remove(self, value: Any) -> None:
+        idx = self.ids.index(value)
+        self.pop(idx)
+
+    def sort(self, reverse: bool = False) -> None:
+        super().sort(
+            key=lambda item: getattr(item, self._id_field),
+            reverse=reverse,
+        )
+
+    @property
+    def ids(self) -> list[Any]:
+        return [getattr(item, self._id_field) for item in self]
+
+    def get(self, value: Any) -> T:
+        return self[self.ids.index(value)]
