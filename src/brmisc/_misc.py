@@ -562,30 +562,30 @@ class ListOfObjs(list):
             x.append(item)
         return x
 
-    def append(self, item: T) -> None:
+    def append(self, item: T, /) -> None:
         self._validate_item(item)
         super().append(item)
 
-    def count(self, value: Any) -> int:
+    def count(self, value: Any, /) -> int:
         return self.ids.count(value)
 
-    def extend(self, iterable: Sequence[T]) -> Sequence[T]:
+    def extend(self, iterable: Sequence[T], /) -> Sequence[T]:
         self._validate_iterable(iterable)
         for item in iterable:
             self.append(item)
 
-    def index(self, value: Any) -> int:
+    def index(self, value: Any, /) -> int:
         return self.ids.index(value)
 
-    def insert(self, index: int, item: T) -> None:
+    def insert(self, index: int, item: T, /) -> None:
         self._validate_item(item)
         super().insert(index, item)
 
-    def remove(self, value: Any) -> None:
+    def remove(self, value: Any, /) -> None:
         idx = self.ids.index(value)
         self.pop(idx)
 
-    def sort(self, reverse: bool = False) -> None:
+    def sort(self, *, reverse: bool = False) -> None:
         super().sort(
             key=lambda item: getattr(item, self._id_field),
             reverse=reverse,
@@ -595,5 +595,5 @@ class ListOfObjs(list):
     def ids(self) -> list[Any]:
         return [getattr(item, self._id_field) for item in self]
 
-    def get(self, value: Any) -> T:
+    def get(self, value: Any, /) -> T:
         return self[self.ids.index(value)]
