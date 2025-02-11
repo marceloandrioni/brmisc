@@ -513,9 +513,10 @@ class ListOfObjs(list):
         for item in iterable or []:
             self.append(item)
 
-    def __repr__(self) -> list[Any]:
+    def __repr__(self) -> str:
         return self.ids.__repr__()
 
+    @validate_types_in_func_call
     def _validate_item(self, item: T) -> None:
 
         if not isinstance(item, self._class_def):
@@ -536,9 +537,30 @@ class ListOfObjs(list):
             )
             raise ValueError(err_msg)
 
+    def _validate_iterable(self, value: Sequence[T]) -> None:
+
+        # Note:
+        # https://docs.pydantic.dev/2.10/errors/usage_errors/#invalid-self-type
+        # at the current version (2.10.6) pydantic does not allow Self validation
+        #
+        # @validate_types_in_func_call
+        # def func(self, value: Self) -> Self:
+        #   ....
+        #
+        # So checking to make sure value/iterable is of type ListOfObjs.
+        if not isinstance(value, type(self)):
+            raise ValueError(f"value must be of type {self.__class__.__name__}")
+
     def __setitem__(self, index: int, item: T) -> None:
         self._validate_item(item)
         super().__setitem__(index, item)
+
+    def __add__(self, iterable: Sequence[T]) -> Sequence[T]:
+        self._validate_iterable(iterable)
+        x = self.copy()
+        for item in iterable:
+            x.append(item)
+        return x
 
     def append(self, item: T) -> None:
         self._validate_item(item)
@@ -547,7 +569,8 @@ class ListOfObjs(list):
     def count(self, value: Any) -> int:
         return self.ids.count(value)
 
-    def extend(self, iterable: Sequence) -> None:
+    def extend(self, iterable: Sequence[T]) -> Sequence[T]:
+        self._validate_iterable(iterable)
         for item in iterable:
             self.append(item)
 
