@@ -467,7 +467,7 @@ class ListOfObjs(list):
     >>> students = ListOfObjs((student1, student2), id_field="name")
 
     >>> students = ListOfObjs((student1, student2, teacher1), id_field="name")
-    ValueError: Object must be of type 'Student'
+    TypeError: Object must be of type 'Student'
 
     Initialize a empty ListOfObjs and then append
 
@@ -476,8 +476,7 @@ class ListOfObjs(list):
     >>> students.append(student2)
 
     >>> students = ListOfObjs((student1, student2, student3), id_field="name")
-    ValueError: Values in attribute 'name' must be unique. Value 'John' already
-        exists.
+    ValueError: Value 'John' appears more than once.
 
     >>> students = ListOfObjs((student1, student2, student3), id_field="name", unique=False)
 
@@ -516,28 +515,15 @@ class ListOfObjs(list):
     def __repr__(self) -> str:
         return self.ids.__repr__()
 
-    @validate_types_in_func_call
-    def _validate_item(self, item: T) -> None:
+    def _validate_item_type(self, item: T) -> None:
 
         if not isinstance(item, self._class_def):
-            raise ValueError(f"Object must be of type '{self._class_def.__name__}'")
+            raise TypeError(f"Object must be of type '{self._class_def.__name__}'")
 
         if not hasattr(item, self._id_field):
-            raise ValueError(f"Object must have attribute '{self._id_field}'")
+            raise TypeError(f"Object must have attribute '{self._id_field}'")
 
-        if not self._unique:
-            return
-
-        id_item = getattr(item, self._id_field)
-        ids = self.ids + [id_item]
-        if ids.count(id_item) > 1:
-            err_msg = (
-                f"Values in attribute '{self._id_field}' must be unique."
-                f" Value '{id_item}' already exists."
-            )
-            raise ValueError(err_msg)
-
-    def _validate_iterable(self, value: Sequence[T]) -> None:
+    def _validate_iterable_type(self, value: Sequence[T]) -> None:
 
         # Note:
         # https://docs.pydantic.dev/2.10/errors/usage_errors/#invalid-self-type
@@ -549,28 +535,41 @@ class ListOfObjs(list):
         #
         # So checking to make sure value/iterable is of type ListOfObjs.
         if not isinstance(value, type(self)):
-            raise ValueError(f"value must be of type {self.__class__.__name__}")
+            raise TypeError(f"Object must be of type {self.__class__.__name__}")
+
+    @staticmethod
+    def _raise_if_non_unique(itens: list[Any], new_item: Any) -> None:
+        """Raise if "itens + [new_item]" has non unique values."""
+
+        if set(itens + [new_item]) == set(itens):
+            raise ValueError(f"Value '{new_item}' appears more than once.")
 
     def __setitem__(self, index: int, item: T) -> None:
-        self._validate_item(item)
+        self._validate_item_type(item)
+
+        if self._unique:
+            ids = self.ids
+            ids.pop(index)
+            self._raise_if_non_unique(ids, getattr(item, self._id_field))
+
         super().__setitem__(index, item)
 
     def __add__(self, iterable: Sequence[T]) -> Sequence[T]:
-        self._validate_iterable(iterable)
+        self._validate_iterable_type(iterable)
         x = self.copy()
         for item in iterable:
             x.append(item)
         return x
 
     def append(self, item: T, /) -> None:
-        self._validate_item(item)
-        super().append(item)
+        idx = len(self)
+        self.insert(idx, item)
 
     def count(self, value: Any, /) -> int:
         return self.ids.count(value)
 
     def extend(self, iterable: Sequence[T], /) -> Sequence[T]:
-        self._validate_iterable(iterable)
+        self._validate_iterable_type(iterable)
         for item in iterable:
             self.append(item)
 
@@ -578,7 +577,12 @@ class ListOfObjs(list):
         return self.ids.index(value)
 
     def insert(self, index: int, item: T, /) -> None:
-        self._validate_item(item)
+        self._validate_item_type(item)
+
+        if self._unique:
+            ids = self.ids
+            self._raise_if_non_unique(ids, getattr(item, self._id_field))
+
         super().insert(index, item)
 
     def remove(self, value: Any, /) -> None:
