@@ -29,25 +29,24 @@ from .type_validation import validate_types_in_func_call
 
 
 class kwargs2attrs:
+    """A utility class to dynamically convert keyword arguments (kwargs) into instance attributes.
+
+    Parameters
+    ----------
+    **kwargs : Any
+        Arbitrary keyword arguments used to populate instance attributes.
+
+    Examples
+    --------
+    >>> obj = kwargs2attrs(name="John", age=30)
+    >>> obj.name
+    'John'
+    >>> obj.age
+    30
+
+    """
 
     def __init__(self, **kwargs) -> None:
-        """
-        A utility class to dynamically convert keyword arguments (kwargs) into instance attributes.
-
-        Parameters
-        ----------
-        **kwargs : Any
-            Arbitrary keyword arguments used to populate instance attributes.
-
-        Examples
-        --------
-        >>> obj = kwargs2attrs(name="John", age=30)
-        >>> obj.name
-        'John'
-        >>> obj.age
-        30
-
-        """
 
         # allow only names starting with a-zA-Z or underscore (_)
         pattern = r"^[a-zA-Z_][a-zA-Z0-9_]*$"
@@ -104,8 +103,43 @@ def random_str(
 
 
 class Outfile:
+    """A context manager for safely handling file creation, optionally using a
+    temporary file during the process. This class ensures that the target file
+    is only finalized once the operations inside the context block are successful.
 
-    # @todo: option to check if the file type is correct using magic or a func, e.g.:
+    Parameters
+    ----------
+    path : str | Path
+        The path where the output file will be created.
+    overwrite : bool, optional
+        Whether to overwrite the target file if it already exists.
+        Defaults to False.
+    use_temporary_file : bool, optional
+        Whether to use a temporary file before finalizing the output file.
+        Defaults to True.
+    delete_temporary_file_on_error : bool, optional
+        If an error occurs during the context block, deletes the temporary
+        file. Defaults to True.
+    mandatory_extension : str or None, optional
+        Enforces a specific file extension for the output file.
+
+    Examples
+    --------
+    Use `Outfile` to safely create a file, leveraging a temporary file for
+    atomic writes:
+
+    >>> with Outfile("/tmp/some/dir/myfile.txt") as outfile:
+    ...     with open(outfile, "w") as fp:
+    ...         print(f"Writing data to temporary file: {outfile}")
+    ...         fp.write("Hello!")
+
+    After the context block completes successfully, the temporary file (if used)
+    will be renamed to the final target file. If an error occurs, the temporary
+    file will be deleted (if `delete_temporary_file_on_error` is True).
+
+    """
+
+    # @todo: option to check if the file type is correct using file magic or a func, e.g.:
     #
     # Outfile(..., check_file="netcdf")
     #
@@ -126,42 +160,6 @@ class Outfile:
         delete_temporary_file_on_error: bool = True,
         mandatory_extension: Annotated[str, Field(pattern=r"^\.[a-zA-Z0-9]+")] | None = None,
     ) -> None:
-        """A context manager for safely handling file creation, optionally using
-        a temporary file during the process. This class ensures that the target
-        file is only finalized once the operations inside the context block are
-        successful.
-
-        Parameters
-        ----------
-        path : str | Path
-            The path where the output file will be created.
-        overwrite : bool, optional
-            Whether to overwrite the target file if it already exists.
-            Defaults to False.
-        use_temporary_file : bool, optional
-            Whether to use a temporary file before finalizing the output file.
-            Defaults to True.
-        delete_temporary_file_on_error : bool, optional
-            If an error occurs during the context block, deletes the temporary
-            file. Defaults to True.
-        mandatory_extension : str or None, optional
-            Enforces a specific file extension for the output file.
-
-        Examples
-        --------
-        Use `Outfile` to safely create a file, leveraging a temporary file for
-        atomic writes:
-
-        >>> with Outfile("/tmp/some/dir/myfile.txt") as outfile:
-        ...     with open(outfile, "w") as fp:
-        ...         print(f"Writing data to temporary file: {outfile}")
-        ...         fp.write("Hello!")
-
-        After the context block completes successfully, the temporary file (if
-        used) will be renamed to the final target file. If an error occurs, the
-        temporary file will be deleted (if `delete_temporary_file_on_error` is True).
-
-        """
 
         self.path = Path(path)
         self.overwrite = overwrite
@@ -203,6 +201,29 @@ class Outfile:
 
 
 class Timeit:
+    """A context manager for measuring the execution time of a block of code,
+    with optional display of the elapsed time.
+
+    Parameters
+    ----------
+    display_msg : bool, optional
+        Whether to print the execution time message after the block has been
+        executed. Defaults to True.
+    msg_template : str, optional
+        Message template. {time_delta} will be replaced by the actual execution
+        time.
+
+    Examples
+    --------
+    >>> with Timeit() as timer:
+    ...     time.sleep(2)
+    Execution time: 0:00:02.000123
+
+    >>> with Timeit(msg_template="with block took: {time_delta}") as timer:
+    ...     time.sleep(2)
+    with block took: 0:00:02.012325
+
+    """
 
     @validate_types_in_func_call
     def __init__(
@@ -211,30 +232,6 @@ class Timeit:
         display_msg: bool = True,
         msg_template: Annotated[str, Field(pattern=r"\{time_delta\}")] = "Execution time: {time_delta}",
     ) -> None:
-        """
-        A context manager for measuring the execution time of a block of code,
-        with optional display of the elapsed time.
-
-        Parameters
-        ----------
-        display_msg : bool, optional
-            Whether to print the execution time message after the block has
-            been executed. Defaults to True.
-        msg_template : str, optional
-            Message template. {time_delta} will be replaced by the actual
-            execution time.
-
-        Examples
-        --------
-        >>> with Timeit() as timer:
-        ...     time.sleep(2)
-        Execution time: 0:00:02.000123
-
-        >>> with Timeit(msg_template="with block took: {time_delta}") as timer:
-        ...     time.sleep(2)
-        with block took: 0:00:02.012325
-
-        """
 
         self.display_msg = display_msg
         self.msg_template = msg_template
@@ -304,8 +301,7 @@ def evaluate_operation(
     right_side_value: Any,
     /,
 ) -> bool:
-    """
-    Evaluate a comparison operation between two values.
+    """Evaluate a comparison operation between two values.
 
     This function takes two values and a specified comparison operation,
     and returns the result of the operation as a boolean.
@@ -367,8 +363,7 @@ def raise_if_operation_is_false(
     right_side_value: Any,
     /,
 ) -> None:
-    """
-    Raise a ValueError if the specified comparison operation evaluates to False.
+    """Raise a ValueError if the specified comparison operation evaluates to False.
 
     This function takes two values along with their names and a specified
     comparison operation. If the operation evaluates to False, it raises
@@ -430,8 +425,7 @@ T = TypeVar("T")
 
 
 class ListOfObjs(list):
-    """
-    A custom list implementation that holds objects of a specified class type
+    """A custom list implementation that holds objects of a specified class type
     and ensures that each object has a specific attribute (id_field).
 
     Parameters:
