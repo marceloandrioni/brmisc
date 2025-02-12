@@ -5,6 +5,7 @@ __all__ = [
     "datetime_like",
     "datetime_like_naive",
     "datetime_like_aware",
+    "datetime_like_naive_or_utc",
     "datetime_like_naive_or_utc_to_naive",
     "datetime_like_naive_or_utc_to_utc",
     "dt_must_be_YYYYmmdd_HHMM00",   # rounded to second
@@ -255,10 +256,19 @@ def dt_naive_to_dt_utc(dt: datetime.datetime) -> datetime.datetime:
 
 
 def dt_must_be_utc(dt: datetime.datetime) -> datetime.datetime:
-    """Raise exception if datetime timezone is not UTC."""
+    """Raise exception if datetime is not UTC."""
     if dt.tzinfo.utcoffset(dt) != datetime.timedelta(0):
-        raise ValueError("Input should have UTC timezone")
+        raise ValueError("Input should be UTC")
     return dt
+
+
+def dt_must_be_naive_or_utc(dt: datetime.datetime) -> datetime.datetime:
+    """Raise exception if datetime is not naive or UTC."""
+    if dt.tzinfo is None:
+        return dt
+    if dt.tzinfo.utcoffset(dt) == datetime.timedelta(0):
+        return dt
+    raise ValueError("Input should be naive or UTC")
 
 
 def dt_utc_to_dt_naive(dt: datetime.datetime) -> datetime.datetime:
@@ -348,6 +358,33 @@ datetime_like_aware.__doc__ = (
 )
 
 
+datetime_like_naive_or_utc = Annotated[(
+    datetime_like,
+    *(datetime_like.__metadata__),
+    AfterValidator(dt_must_be_naive_or_utc),
+)]
+datetime_like_naive_or_utc.__doc__ = (
+    """Same as datetime_like, but only naive and UTC datetimes are allowed.
+
+    Examples
+    --------
+    >>> validate_type("2001-02-03 04:05:06", datetime_like_naive_or_utc)
+    datetime.datetime(2001, 2, 3, 4, 5, 6)
+
+    >>> validate_type("2001-02-03 04:05:06Z", datetime_like_naive_or_utc)
+    datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
+
+    >>> validate_type("2001-02-03 04:05:06+00:00", datetime_like_naive_or_utc)
+    datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
+
+    >>> validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc)
+      Value error, Input should be naive or UTC [type=value_error,
+    input_value='2001-02-03 04:05:06-03:00', input_type=str]
+
+    """
+)
+
+
 # Note: BeforeValidators are executed right-to-left, while AfterValidators are
 # run left-to-rigth.
 # https://docs.pydantic.dev/latest/concepts/validators/#ordering-of-validators
@@ -374,7 +411,7 @@ datetime_like_naive_or_utc_to_utc.__doc__ = (
     datetime.datetime(2001, 2, 3, 4, 5, 6, tzinfo=datetime.timezone.utc)
 
     >>> validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_utc)
-      Value error, Input should have UTC timezone [type=value_error,
+      Value error, Input should be UTC [type=value_error,
     input_value='2001-02-03 04:05:06-03:00', input_type=str]
 
     """
@@ -403,7 +440,7 @@ datetime_like_naive_or_utc_to_naive.__doc__ = (
     datetime.datetime(2001, 2, 3, 4, 5, 6)
 
     >>> validate_type("2001-02-03 04:05:06-03:00", datetime_like_naive_or_utc_to_naive)
-      Value error, Input should have UTC timezone [type=value_error,
+      Value error, Input should be UTC [type=value_error,
     input_value=datetime.datetime(2001, 2...ays=-1, seconds=75600))),
     input_type=datetime]
 
