@@ -538,7 +538,11 @@ class ListOfObjs(list):
         #
         # So checking to make sure value/iterable is of type ListOfObjs.
         if not isinstance(value, type(self)):
-            raise TypeError(f"Object must be of type {self.__class__.__name__}")
+            err_msg = (
+                f"can only concatenate {self.__class__.__name__}"
+                f" (not '{value.__class__.__name__}') to {self.__class__.__name__}"
+            )
+            raise TypeError(err_msg)
 
     @staticmethod
     def _raise_if_non_unique(itens: list[Any], new_item: Any) -> None:
