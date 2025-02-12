@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 __all__ = [
     "kwargs2attrs",
     "random_str",
@@ -554,7 +557,7 @@ class ListOfObjs(list):
 
         super().__setitem__(index, item)
 
-    def __add__(self, iterable: Sequence[T]) -> Sequence[T]:
+    def __add__(self, iterable: "ListOfObjs") -> "ListOfObjs":
         self._validate_iterable_type(iterable)
         x = self.copy()
         for item in iterable:
@@ -568,8 +571,7 @@ class ListOfObjs(list):
     def count(self, value: Any, /) -> int:
         return self.ids.count(value)
 
-    def extend(self, iterable: Sequence[T], /) -> Sequence[T]:
-        self._validate_iterable_type(iterable)
+    def extend(self, iterable: Sequence[T], /) -> "ListOfObjs":
         for item in iterable:
             self.append(item)
 
