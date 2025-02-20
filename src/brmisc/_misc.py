@@ -17,15 +17,19 @@ import sys
 from typing import Callable, Annotated, Any, Literal, Sequence, TypeVar
 import random
 import string
-from functools import wraps
+from functools import wraps, partial
 import datetime
 from pathlib import Path
 import pprint
 import re
 import operator
+from copy import deepcopy
 
-from pydantic import Field
+from pydantic import Field, AfterValidator
 from .type_validation import validate_types_in_func_call
+
+
+T = TypeVar("T")
 
 
 class kwargs2attrs:
@@ -421,7 +425,16 @@ def raise_if_operation_is_false(
     raise ValueError(err_msg)
 
 
-T = TypeVar("T")
+def has_attr(value: Any, attr: str) -> Any:
+    assert hasattr(value, attr), f"Must have attribute {attr}"
+    return value
+
+
+def add_type_validation(func: Callable, annotations: dict[str, Any]) -> Callable:
+    for arg_name, arg_type in annotations.items():
+        func.__annotations__[arg_name] = arg_type
+    func = validate_types_in_func_call(func)
+    return func
 
 
 class ListOfObjs(list):
@@ -492,18 +505,27 @@ class ListOfObjs(list):
     ) -> None:
 
         self._id_field = id_field
+        self._unique = unique
 
         if not any((iterable, class_def)):
             raise ValueError("iterable OR class_def must be given")
 
         # get type from class_def or from the first item in iterable
+        class_def = type(next(iter(iterable))) if class_def is None else class_def
+
+        # hacky way of adding pydantic type validation to methods based on an
+        # user supplied class
         #
         # Note: hasattr(class_def, id_field) returns False for classes
         # defined with dataclass, pydantic.BaseModel, etc. Therefore, the
-        # presence of attribute id_field should be checked in the intances
-        self._class_def = type(next(iter(iterable))) if class_def is None else class_def
+        # presence of attribute id_field can only be checked in the intances
+        item_type = Annotated[class_def, AfterValidator(partial(has_attr, attr=id_field))]
 
-        self._unique = unique
+        self.__setitem__ = add_type_validation(self.__setitem__, {"item": item_type})
+        self.__add__ = add_type_validation(self.__add__, {"iterable": type(self), "return": type(self)})
+        self.append = add_type_validation(self.append, {"item": item_type})
+        self.extend = add_type_validation(self.extend, {"iterable": Sequence[item_type]})
+        self.insert = add_type_validation(self.insert, {"item": item_type})
 
         super().__init__([])
         for item in iterable or []:
@@ -512,31 +534,21 @@ class ListOfObjs(list):
     def __repr__(self) -> str:
         return self.ids.__repr__()
 
-    def _validate_item_type(self, item: T) -> None:
+    def copy(self):
+        """Return a copy of ListOfObjs.
 
-        if not isinstance(item, self._class_def):
-            raise TypeError(f"Object must be of type '{self._class_def.__name__}'")
+        DO NOT use copy.copy or copy.deepcopy with this object, as they may
+        lead to issues with recursion.
+        """
 
-        if not hasattr(item, self._id_field):
-            raise TypeError(f"Object must have attribute '{self._id_field}'")
+        # Note: have to create a new instance because:
+        # * the super().copy method returns a list and not a ListOfObjs
+        # * copy.copy(self) gets stuck in some infinite recursion due to pydantic validation
 
-    def _validate_iterable_type(self, value: Sequence[T]) -> None:
-
-        # Note:
-        # https://docs.pydantic.dev/2.10/errors/usage_errors/#invalid-self-type
-        # at the current version (2.10.6) pydantic does not allow Self validation
-        #
-        # @validate_types_in_func_call
-        # def func(self, value: Self) -> Self:
-        #   ....
-        #
-        # So checking to make sure value/iterable is of type ListOfObjs.
-        if not isinstance(value, type(self)):
-            err_msg = (
-                f"can only concatenate {self.__class__.__name__}"
-                f" (not '{value.__class__.__name__}') to {self.__class__.__name__}"
-            )
-            raise TypeError(err_msg)
+        return self.__class__(
+            [x for x in self],
+            id_field=self._id_field,
+            unique=self._unique)
 
     @staticmethod
     def _raise_if_non_unique(itens: list[Any], new_item: Any) -> None:
@@ -545,44 +557,37 @@ class ListOfObjs(list):
         if set(itens + [new_item]) == set(itens):
             raise ValueError(f"Value '{new_item}' appears more than once.")
 
-    def __setitem__(self, index: int, item: T) -> None:
-        self._validate_item_type(item)
-
+    def __setitem__(self, index: int, item) -> None:
         if self._unique:
             ids = self.ids
             ids.pop(index)
             self._raise_if_non_unique(ids, getattr(item, self._id_field))
-
         super().__setitem__(index, item)
 
-    def __add__(self, iterable: "ListOfObjs") -> "ListOfObjs":
-        self._validate_iterable_type(iterable)
+    def __add__(self, iterable):
         x = self.copy()
         for item in iterable:
             x.append(item)
         return x
 
-    def append(self, item: T, /) -> None:
+    def append(self, item, /) -> None:
         idx = len(self)
         self.insert(idx, item)
 
     def count(self, value: Any, /) -> int:
         return self.ids.count(value)
 
-    def extend(self, iterable: Sequence[T], /) -> "ListOfObjs":
+    def extend(self, iterable, /) -> None:
         for item in iterable:
             self.append(item)
 
     def index(self, value: Any, /) -> int:
         return self.ids.index(value)
 
-    def insert(self, index: int, item: T, /) -> None:
-        self._validate_item_type(item)
-
+    def insert(self, index: int, item, /) -> None:
         if self._unique:
             ids = self.ids
             self._raise_if_non_unique(ids, getattr(item, self._id_field))
-
         super().insert(index, item)
 
     def remove(self, value: Any, /) -> None:
