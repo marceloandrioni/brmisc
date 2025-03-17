@@ -23,7 +23,6 @@ from pathlib import Path
 import pprint
 import re
 import operator
-from copy import deepcopy
 
 from pydantic import Field, AfterValidator
 from .type_validation import validate_types_in_func_call
@@ -534,21 +533,19 @@ class ListOfObjs(list):
     def __repr__(self) -> str:
         return self.ids.__repr__()
 
-    def copy(self):
-        """Return a copy of ListOfObjs.
+    def __copy__(self):
 
-        DO NOT use copy.copy or copy.deepcopy with this object, as they may
-        lead to issues with recursion.
-        """
-
-        # Note: have to create a new instance because:
-        # * the super().copy method returns a list and not a ListOfObjs
-        # * copy.copy(self) gets stuck in some infinite recursion due to pydantic validation
+        # Note: need to create a new method to replace the standard
+        # __copy__/__deepcopy__ to avoid getting stuck in some infinite
+        # recursion due to pydantic validation
 
         return self.__class__(
             [x for x in self],
             id_field=self._id_field,
             unique=self._unique)
+
+    def __deepcopy__(self):
+        return self.__copy__()
 
     @staticmethod
     def _raise_if_non_unique(itens: list[Any], new_item: Any) -> None:
@@ -565,7 +562,7 @@ class ListOfObjs(list):
         super().__setitem__(index, item)
 
     def __add__(self, iterable):
-        x = self.copy()
+        x = self.__copy__()
         for item in iterable:
             x.append(item)
         return x

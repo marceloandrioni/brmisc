@@ -90,6 +90,7 @@ def test_datetime_like_with_timestamp():
 
 def test_datetime_like_with_str():
 
+    # @todo: replace this with @pytest.mark.parametrize
     Y = datetime.datetime(2001, 1, 1)
     Ym = datetime.datetime(2001, 2, 1)
     Ymd = datetime.datetime(2001, 2, 3)
