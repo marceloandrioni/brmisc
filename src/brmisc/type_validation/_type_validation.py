@@ -32,6 +32,7 @@ from pydantic import (
     Field, NaiveDatetime, AwareDatetime, FilePath, DirectoryPath)
 import numpy as np
 import pandas as pd
+import xarray as xr
 
 
 # Note:
@@ -138,9 +139,24 @@ def parse_round_number(value: Any) -> Any:
     return value
 
 
+def iterable_with_one_element_to_scalar(value: Any) -> Any:
+
+    if isinstance(value, (np.ndarray, pd.Series, xr.DataArray)) and value.size == 1:
+        return value.item()
+
+    if hasattr(value, "__len__") and len(value) == 1:
+        return value[0]
+
+    return value
+
+
+# Note: BeforeValidators are executed right-to-left, while AfterValidators are
+# run left-to-rigth.
+# https://docs.pydantic.dev/latest/concepts/validators/#ordering-of-validators
 int_like = Annotated[
     int,
     BeforeValidator(parse_round_number),
+    BeforeValidator(iterable_with_one_element_to_scalar),
 ]
 int_like.__doc__ = (
     """Type alias to validate int_like (int, round float, round decimal, etc)

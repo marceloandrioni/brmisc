@@ -12,7 +12,7 @@ __all__ = [
 
 
 import sys
-from typing import Callable, Annotated, Any, Literal, Sequence, TypeVar
+from typing import Callable, Annotated, Any, Sequence, TypeVar
 import random
 import string
 from functools import wraps, partial
@@ -20,7 +20,6 @@ import datetime
 from pathlib import Path
 import pprint
 import re
-import operator
 
 from pydantic import Field, AfterValidator
 from .type_validation import validate_types_in_func_call
