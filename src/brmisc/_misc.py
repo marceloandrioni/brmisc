@@ -544,7 +544,7 @@ class ListOfObjs(list):
             id_field=self._id_field,
             unique=self._unique)
 
-    def __deepcopy__(self):
+    def __deepcopy__(self, memo):
         return self.__copy__()
 
     @staticmethod
