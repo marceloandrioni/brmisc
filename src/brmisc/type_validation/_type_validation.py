@@ -159,8 +159,8 @@ int_like = Annotated[
     BeforeValidator(iterable_with_one_element_to_scalar),
 ]
 int_like.__doc__ = (
-    """Type alias to validate int_like (int, round float, round decimal, iterables
-    with a single element, etc) and coerce it to int.
+    """Type alias to validate int_like (int, round float, round decimal,
+    numpy scalars, iterables with a single element, etc) and coerce it to int.
 
     Examples
     --------
