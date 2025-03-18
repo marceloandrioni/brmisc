@@ -74,14 +74,14 @@ def random_str(
 
     Parameters
     ----------
-    n: int, optional
+    n : int, optional
         Number of characters. A string with 8 characters and sample space of 62
         [a-zA-Z0-9] has ~218 quadrillion (62**8) possibilities.
-    lowercase: bool, optional
+    lowercase : bool, optional
         Use lowercase letters [a-z].
-    uppercase: bool, optional
+    uppercase : bool, optional
         Use uppercase letters [A-Z].
-    digits: bool, optional
+    digits : bool, optional
         Use digits [0-9].
 
     Returns
@@ -128,6 +128,7 @@ class Outfile:
 
     Examples
     --------
+
     Use `Outfile` to safely create a file, leveraging a temporary file for
     atomic writes:
 
