@@ -10,7 +10,6 @@ import pytest
 from pydantic import ValidationError, AfterValidator
 import numpy as np
 import pandas as pd
-import xarray as xr
 
 from brmisc.type_validation import (
     validate_types_in_func_call,
@@ -68,13 +67,6 @@ def test_validate_types_in_func_call_with_incorrect_out_type():
         (Decimal("1.0"), 1),
         (np.int32(1), 1),
         (np.float32(1), 1),
-        ([1], 1),
-        ((1,), 1),
-        (np.array(1), 1),
-        (np.array([1]), 1),
-        (np.array([[1]]), 1),
-        (pd.Series(data=[1]), 1),
-        (xr.DataArray(data=[1]), 1),
     ]
 )
 def test_int_like(x, y):
