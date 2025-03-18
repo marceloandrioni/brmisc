@@ -7,8 +7,6 @@ __all__ = [
     "Outfile",
     "Timeit",
     "timeit",
-    "evaluate_operation",
-    "raise_if_operation_is_false",
     "ListOfObjs",
 ]
 
