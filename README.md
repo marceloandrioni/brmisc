@@ -1,7 +1,7 @@
 Just some miscellaneous functions.
 
-Install directly from github with:
+Install directly from git with:
 
 ```
-uv pip install git+https://github.com/marceloandrioni/brmisc
+pip install git+https://<this_git_url>
 ```
